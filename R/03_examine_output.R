@@ -57,8 +57,10 @@ plot_trace <- function(draws_array, coef_names, out_file) {
 plot_posterior_hist <- function(draws_matrix, coef_names, out_file) {
   grDevices::pdf(out_file, width = 12, height = 8)
   on.exit(grDevices::dev.off(), add = TRUE)
-  op <- par(mfrow = c(3, 4), mar = c(3, 3, 2, 1))
-  on.exit(par(op), add = TRUE)
+  n_coef <- length(coef_names)
+  n_col <- ceiling(sqrt(n_coef))
+  n_row <- ceiling(n_coef / n_col)
+  par(mfrow = c(n_row, n_col), mar = c(3, 3, 2, 1))
   for (j in seq_along(coef_names)) {
     hist(draws_matrix[, j], main = coef_names[j], xlab = "", col = "grey80", border = "white")
     abline(v = mean(draws_matrix[, j]), col = "firebrick", lwd = 2)
@@ -106,20 +108,37 @@ examine_fire_model <- function(
     "intercept", "TAAve", "TSAve", "TSHotweek",
     "PATot", "PSTot", "aao", "pptconc", "spring", "summer", "fall"
   )
-  compare_df <- data.frame(
-    original_order = original_order,
-    stan_order = coef_names,
-    matched = original_order == coef_names,
-    row.names = NULL,
-    check.names = FALSE
-  )
+  if (length(coef_names) != length(original_order)) {
+    warning(
+      "Coefficient length mismatch: expected ", length(original_order),
+      ", got ", length(coef_names), ". Marking matches as NA."
+    )
+    stan_order_aligned <- rep(NA_character_, length(original_order))
+    n_fill <- min(length(coef_names), length(original_order))
+    stan_order_aligned[seq_len(n_fill)] <- coef_names[seq_len(n_fill)]
+    compare_df <- data.frame(
+      original_order = original_order,
+      stan_order = stan_order_aligned,
+      matched = NA,
+      row.names = NULL,
+      check.names = FALSE
+    )
+  } else {
+    compare_df <- data.frame(
+      original_order = original_order,
+      stan_order = coef_names,
+      matched = original_order == coef_names,
+      row.names = NULL,
+      check.names = FALSE
+    )
+  }
   utils::write.csv(compare_df, file.path(out_dir, "coefficient_order_comparison.csv"), row.names = FALSE)
 
   # Acceptance-rate summaries
   accept_df <- NULL
   if (fit_obj$engine == "cmdstanr") {
-    sd_mat <- fit_obj$fit$sampler_diagnostics(format = "matrix")
-    accept_df <- data.frame(mean_accept_stat = mean(sd_mat[, "accept_stat__"]))
+    sampler_diag_mat <- fit_obj$fit$sampler_diagnostics(format = "matrix")
+    accept_df <- data.frame(mean_accept_stat = mean(sampler_diag_mat[, "accept_stat__"]))
   } else if (fit_obj$engine == "rstan") {
     sp <- rstan::get_sampler_params(fit_obj$fit, inc_warmup = FALSE)
     accepts <- unlist(lapply(sp, function(x) x[, "accept_stat__"]))

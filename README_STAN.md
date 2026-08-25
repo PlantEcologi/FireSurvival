@@ -6,7 +6,7 @@ This repository now includes a Stan-based reimplementation of the non-spatial wi
 
 The Stan model is in:
 
-- `/home/runner/work/FireSurvival/FireSurvival/stan/firemodel.stan`
+- `stan/firemodel.stan`
 
 It fits a hierarchical-ready probit regression for binary fire occurrence:
 
@@ -19,7 +19,7 @@ where \(\Phi\) is the standard normal CDF.
 
 To match the original R/MCMC implementation, coefficients use diffuse priors:
 
-- \( \beta_k \sim \mathcal{N}(0, 1000^2) \)
+- \( \beta_k \sim \mathcal{N}(0, 1000) \) in Stan parameterization (SD = 1000)
 
 ### Left censoring and legacy exclusions
 
@@ -36,7 +36,7 @@ These exclusions are passed as `include_row` and applied directly in the Stan li
 
 Script:
 
-- `/home/runner/work/FireSurvival/FireSurvival/R/01_prepare_data.R`
+- `R/01_prepare_data.R`
 
 What it does:
 
@@ -58,7 +58,7 @@ Rscript R/01_prepare_data.R
 
 Script:
 
-- `/home/runner/work/FireSurvival/FireSurvival/R/02_fit_model.R`
+- `R/02_fit_model.R`
 
 What it does:
 
@@ -79,7 +79,7 @@ Rscript R/02_fit_model.R
 
 Script:
 
-- `/home/runner/work/FireSurvival/FireSurvival/R/03_examine_output.R`
+- `R/03_examine_output.R`
 
 What it does:
 

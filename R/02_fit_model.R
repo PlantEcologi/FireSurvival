@@ -18,7 +18,16 @@ fit_fire_model <- function(
   engine <- NULL
   fit <- NULL
 
-  if (requireNamespace("cmdstanr", quietly = TRUE) && cmdstanr::cmdstan_version(error_on_NA = FALSE) != "") {
+  cmdstan_ready <- FALSE
+  if (requireNamespace("cmdstanr", quietly = TRUE)) {
+    cmdstan_ready <- tryCatch({
+      !is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE))
+    }, error = function(e) {
+      FALSE
+    })
+  }
+
+  if (cmdstan_ready) {
     engine <- "cmdstanr"
     message("Using cmdstanr backend")
     mod <- cmdstanr::cmdstan_model(stan_file)

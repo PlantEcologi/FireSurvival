@@ -11,16 +11,12 @@ parameters {
 }
 
 model {
-  // Match legacy diffuse priors (R implementation used Normal(0, 1000)).
+  // Match legacy diffuse priors (R used Normal mean 0, SD 1000).
   beta ~ normal(0, 1000);
 
   for (n in 1:N) {
     if (include_row[n] == 1) {
-      if (y[n] == 1) {
-        target += normal_lcdf(dot_product(X[n], beta) | 0, 1);
-      } else {
-        target += normal_lccdf(dot_product(X[n], beta) | 0, 1);
-      }
+      target += bernoulli_lpmf(y[n] | Phi(dot_product(X[n], beta)));
     }
   }
 }
@@ -34,11 +30,7 @@ generated quantities {
     p_fire[n] = Phi(eta);
 
     if (include_row[n] == 1) {
-      if (y[n] == 1) {
-        log_lik[n] = normal_lcdf(eta | 0, 1);
-      } else {
-        log_lik[n] = normal_lccdf(eta | 0, 1);
-      }
+      log_lik[n] = bernoulli_lpmf(y[n] | Phi(eta));
     } else {
       log_lik[n] = 0;
     }

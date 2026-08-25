@@ -4,7 +4,7 @@ release_urls <- c(
   static = "https://github.com/AdamWilsonLab/FireSurvival2010/releases/download/Data/static.csv"
 )
 
-scale01 <- function(x) {
+zscore <- function(x) {
   as.numeric(scale(x))
 }
 
@@ -41,8 +41,8 @@ prepare_fire_data <- function(
   conc <- utils::read.csv(paths$conc)
 
   # Legacy script dropped first column in conc.csv; do that only when appropriate.
-  if (ncol(conc) > 1 && !"pid" %in% names(conc) && "pid" %in% names(conc[-1])) {
-    conc <- conc[-1]
+  if (ncol(conc) > 1 && !"pid" %in% names(conc) && "pid" %in% names(conc[, -1, drop = FALSE])) {
+    conc <- conc[, -1, drop = FALSE]
   }
 
   static <- static[order(static$gid), ]
@@ -61,11 +61,12 @@ prepare_fire_data <- function(
   data <- data[order(data$gid, data$sid), ]
 
   if (isTRUE(scale_pptconc)) {
-    data$pptconc <- scale01(data$pptconc)
+    data$pptconc <- zscore(data$pptconc)
   }
 
   data$aao[is.na(data$aao)] <- mean(data$aao, na.rm = TRUE)
 
+  # Legacy season coding from source data: 1 = fall, 3 = spring, 4 = summer.
   data$spring <- as.integer(data$season == 3)
   data$summer <- as.integer(data$season == 4)
   data$fall <- as.integer(data$season == 1)
@@ -81,26 +82,35 @@ prepare_fire_data <- function(
   gid_unique <- sort(unique(data$gid))
   n_grid <- length(gid_unique)
   N <- nrow(data)
-  n_seas <- N / n_grid
+  seasons_per_grid <- as.integer(table(factor(data$gid, levels = gid_unique)))
+  n_seas <- as.integer(max(seasons_per_grid))
+  if (length(unique(seasons_per_grid)) != 1L) {
+    warning("Grid cells have unequal numbers of seasons; using max seasons per grid in metadata.")
+  }
 
-  gidrow <- vapply(gid_unique, function(g) which(data$gid == g)[1], integer(1))
+  gid_index <- split(seq_len(N), data$gid)
 
   fire <- as.integer(data$fire)
 
   # Left-censor handling (legacy non-spatial model): first 112 seasons were pre-1980.
   left_censor_index <- rep(FALSE, N)
-  for (i in seq_len(n_grid)) {
-    idx <- gidrow[i]:(gidrow[i] + left_censor_length - 1L)
-    idx <- idx[idx <= N]
-    left_censor_index[idx] <- TRUE
+  for (g in names(gid_index)) {
+    idx <- gid_index[[g]]
+    take_n <- min(length(idx), left_censor_length)
+    left_censor_index[idx[seq_len(take_n)]] <- TRUE
   }
 
   # Exclude the season immediately after any observed fire (legacy likelihood behavior).
-  fire_rows <- which(fire == 1L)
   post_fire_exclude <- rep(FALSE, N)
-  post_rows <- fire_rows + 1L
-  post_rows <- post_rows[post_rows <= N]
-  post_fire_exclude[post_rows] <- TRUE
+  for (g in names(gid_index)) {
+    idx <- gid_index[[g]]
+    if (length(idx) <= 1L) next
+    fire_local <- which(fire[idx] == 1L)
+    fire_local <- fire_local[fire_local < length(idx)]
+    if (length(fire_local) > 0L) {
+      post_fire_exclude[idx[fire_local + 1L]] <- TRUE
+    }
+  }
 
   include_row <- !(left_censor_index | post_fire_exclude)
 
@@ -129,6 +139,7 @@ prepare_fire_data <- function(
       gid_unique = gid_unique,
       n_grid = n_grid,
       n_seas = n_seas,
+      seasons_per_grid = seasons_per_grid,
       left_censor_length = left_censor_length,
       first_observed_fire_row = first_observed_fire,
       include_row_count = sum(include_row),
