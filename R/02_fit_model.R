@@ -5,6 +5,7 @@ fit_fire_model <- function(
   chains = 3,
   iter_warmup = 2000,
   iter_sampling = 10000,
+  thin = 10,
   seed = 1234,
   parallel_chains = chains
 ) {
@@ -38,6 +39,7 @@ fit_fire_model <- function(
       parallel_chains = parallel_chains,
       iter_warmup = iter_warmup,
       iter_sampling = iter_sampling,
+      thin = thin,
       refresh = 200
     )
 
@@ -51,7 +53,7 @@ fit_fire_model <- function(
       data = stan_data,
       chains = chains,
       warmup = iter_warmup,
-      iter = iter_warmup + iter_sampling,
+      iter = (iter_warmup + iter_sampling)/thin,
       seed = seed,
       refresh = 200
     )
